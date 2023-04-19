@@ -1,0 +1,17 @@
+*.o
+*.elf
+*.bin
+*.hex
+
+linux-6.2.10
+linux-6.2.10.tar.xz
+
+apps/init
+apps/sh
+apps/mount
+apps/umount
+apps/ls
+apps/lazybox
+
+initramfs
+initramfs.cpio.gz
