@@ -11,7 +11,7 @@ apps/sh
 apps/mount
 apps/umount
 apps/ls
-apps/lazybox
+apps/applets
 
 initramfs
 initramfs.cpio.gz

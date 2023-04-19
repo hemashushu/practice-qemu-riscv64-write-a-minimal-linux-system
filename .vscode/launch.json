@@ -5,6 +5,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
+            // "args": ["tee", "/home/yang/temp/foobar.txt"],
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

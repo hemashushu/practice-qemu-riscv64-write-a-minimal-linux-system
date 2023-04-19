@@ -60,12 +60,13 @@ int main(void)
                         "PATH=/bin:/sbin",
                         NULL};
 
-        char *argv[] = {"sh", NULL}; // arg0 is the first part of command text
-        execve("/bin/sh", argv, envp);
+        // execute the shell directly
+        // char *argv[] = {"sh", NULL};
+        // execve("/bin/sh", argv, envp);
 
         // execute the script
-        // char *argv[] = {"/etc/rc", NULL};
-        // execve("/etc/rc", argv, envp);
+        char *argv[] = {"/etc/rc", NULL};
+        execve("/etc/rc", argv, envp);
 
         // execve nerver return unless error occured.
         perror("execve");

@@ -21,20 +21,20 @@ void print_usage(void)
 {
     char *text =
         "Available applets:\n"
-        "    cat, tee, ps, poweroff\n"
+        "    cat, tee, uname, poweroff\n"
         "\n"
         "Usage:\n"
-        "    lazybox applet_name args0 args1 ...\n"
+        "    applets applet_name args0 args1 ...\n"
         "\n"
         "e.g.\n"
-        "    lazybox cat /path/to/file\n"
-        "    lazybox tee /path/to/file\n"
-        "    lazybox ps\n"
-        "    lazybox poweroff\n"
+        "    applets cat /path/to/file\n"
+        "    applets tee /path/to/file\n"
+        "    applets uname\n"
+        "    applets poweroff\n"
         "\n"
         "You can call the applet by link name by creating a link. e.g.\n"
         "\n"
-        "    $ ln -s lazybox tee\n"
+        "    $ ln -s applets tee\n"
         "    $ tee hello.txt\n"
         "      Hello World!\n"
         "      ^D\n";
@@ -44,7 +44,6 @@ void print_usage(void)
 int command_cat(char *filepath)
 {
     FILE *fd = fopen(filepath, "r");
-
     if (fd == NULL)
     {
         perror("fopen");
@@ -53,9 +52,9 @@ int command_cat(char *filepath)
 
     const int BUF_SIZE = 4096;
     char buf[BUF_SIZE];
-    size_t read_size;
+    size_t bytes_read;
 
-    while ((read_size = fread(buf, 1, BUF_SIZE, fd)) > 0)
+    while ((bytes_read = fread(buf, 1, BUF_SIZE, fd)) > 0)
     {
         fputs(buf, stdout);
     }
@@ -64,18 +63,65 @@ int command_cat(char *filepath)
     return EXIT_SUCCESS;
 }
 
+// read data from stdin and write to the specified file.
 int command_tee(char *filepath)
 {
-    //
-    fputs("tee TODO::\n", stderr);
-    return EXIT_FAILURE;
+    FILE *fd = fopen(filepath, "w");
+    if (fd == NULL)
+    {
+        perror("fopen");
+        return EXIT_FAILURE;
+    }
+
+    const int BUF_SIZE = 4096;
+    char buf[BUF_SIZE];
+    size_t bytes_read;
+
+    while ((bytes_read = fread(buf, 1, BUF_SIZE, stdin)) > 0)
+    {
+        size_t bytes_write = fwrite(buf, 1, bytes_read, fd);
+        if (bytes_write < bytes_read)
+        {
+            perror("fwrite");
+            fclose(fd);
+            return EXIT_FAILURE;
+        }
+
+        if (feof(stdin) != 0)
+        {
+            // Ctrl+D is pressed.
+            break;
+        }
+    }
+
+    // char ch;
+    // while ((ch = fgetc(stdin)) != EOF)
+    // {
+    //     fputc(ch, fd);
+    // }
+
+    fclose(fd);
+    return EXIT_SUCCESS;
 }
 
-int command_ps(void)
+int command_uname(void)
 {
-    //
-    fputs("ps TODO::\n", stderr);
-    return EXIT_FAILURE;
+    char *filepath = "/proc/version";
+    FILE *fd = fopen(filepath, "r");
+    if (fd == NULL)
+    {
+        perror("fopen");
+        fputs("mount /proc first.\n", stderr);
+        return EXIT_FAILURE;
+    }
+
+    const int BUF_SIZE = 1024;
+    char buf[BUF_SIZE];
+    fread(buf, 1, BUF_SIZE, fd);
+    fclose(fd);
+
+    fputs(buf, stdout);
+    return EXIT_SUCCESS;
 }
 
 int command_poweroff(void)
@@ -92,7 +138,7 @@ int main(int argc, char **argv)
 
     char *command;
     int arg_offset;
-    if (strcmp(base_name, "lazybox") == 0)
+    if (strcmp(base_name, "applets") == 0)
     {
         if (argc == 1)
         {
@@ -118,7 +164,7 @@ int main(int argc, char **argv)
         if (argv[arg_offset] == NULL)
         {
             fputs("Usage:\n", stderr);
-            fputs("    lazybox cat /path/to/name\n", stderr);
+            fputs("    applets cat /path/to/name\n", stderr);
             fputs("or\n", stderr);
             fputs("    cat /path/to/name\n", stderr);
             return EXIT_FAILURE;
@@ -131,7 +177,7 @@ int main(int argc, char **argv)
         if (argv[arg_offset] == NULL)
         {
             fputs("Usage:\n", stderr);
-            fputs("    lazybox tee /path/to/name\n", stderr);
+            fputs("    applets tee /path/to/name\n", stderr);
             fputs("or\n", stderr);
             fputs("    tee /path/to/name\n", stderr);
             return EXIT_FAILURE;
@@ -139,9 +185,15 @@ int main(int argc, char **argv)
 
         return command_tee(argv[arg_offset]);
     }
-    else if (strcmp(command, "ps") == 0)
+    else if (strcmp(command, "uname") == 0)
     {
-        return command_ps();
+        if (argv[arg_offset] != NULL)
+        {
+            fputs("Does not support parameters.\n", stderr);
+            return EXIT_FAILURE;
+        }
+
+        return command_uname();
     }
     else if (strcmp(command, "poweroff") == 0)
     {

@@ -7,7 +7,7 @@ riscv64-linux-gnu-gcc -g -Wall -static -o sh sh.c
 riscv64-linux-gnu-gcc -g -Wall -static -o mount mount.c
 riscv64-linux-gnu-gcc -g -Wall -static -o umount umount.c
 riscv64-linux-gnu-gcc -g -Wall -static -o ls ls.c
-riscv64-linux-gnu-gcc -g -Wall -static -o lazybox lazybox.c
+riscv64-linux-gnu-gcc -g -Wall -static -o applets applets.c
 popd
 
 mkdir -p initramfs
@@ -28,7 +28,7 @@ cat > root/hello.txt << "EOF"
 Hello, My own Linux system!
 EOF
 
-cat <<EOF > etc/rc
+cat << "EOF" > etc/rc
 #!/bin/sh
 mount -t proc proc /proc
 
@@ -41,18 +41,20 @@ mount -t devtmpfs devtmpfs /dev
 /bin/sh
 EOF
 
+chmod +x etc/rc
+
 pushd bin
 cp ../../apps/init init
 cp ../../apps/sh sh
 cp ../../apps/mount mount
 cp ../../apps/umount umount
 cp ../../apps/ls ls
-cp ../../apps/lazybox lazybox
+cp ../../apps/applets applets
 
-test -L cat || ln -s lazybox cat
-test -L tee || ln -s lazybox tee
-test -L ps || ln -s lazybox ps
-test -L poweroff || ln -s lazybox poweroff
+test -L cat || ln -s applets cat
+test -L tee || ln -s applets tee
+test -L uname || ln -s applets uname
+test -L poweroff || ln -s applets poweroff
 popd
 
 find . | \

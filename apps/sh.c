@@ -16,6 +16,7 @@
 extern char **environ;
 
 void loop(void);
+int run_script(char *);
 char *get_current_working_directory(void);
 char *get_command_line(void);
 char **convert_to_args(char *);
@@ -28,15 +29,19 @@ int execute_external(char **args);
 
 int main(int argc, char **argv)
 {
-    if (argc > 1)
+    if (argc == 2)
     {
-        fputs("Shell program parameters and script interpreter are not suppoerted yet.\n", stderr);
-        return EXIT_FAILURE;
+        return run_script(argv[1]);
     }
-    else
+    else if (argc == 1)
     {
         loop();
         return EXIT_SUCCESS;
+    }
+    else
+    {
+        fputs("Does not support parameters.\n", stderr);
+        return EXIT_FAILURE;
     }
 }
 
@@ -65,6 +70,37 @@ void loop(void)
         free(line);
         free(args);
     } while (should_continue_next);
+}
+
+int run_script(char *filepath)
+{
+    FILE *fd = fopen(filepath, "r");
+    if (fd == NULL)
+    {
+        perror("fopen");
+        return EXIT_FAILURE;
+    }
+
+    char *line = NULL;
+    size_t len = 0;
+
+    while (getline(&line, &len, fd) != -1)
+    {
+        // skip line comment
+        if (line[0] == '#')
+        {
+            continue;
+        }
+
+        char **args = convert_to_args(line);
+        execute(args);
+        free(args);
+    }
+
+    free(line);
+    fclose(fd);
+
+    return EXIT_SUCCESS;
 }
 
 char *get_current_working_directory(void)
@@ -186,11 +222,11 @@ int command_cd(char *dest)
         }
         else
         {
-            // update $CWD and $OLDCWD
+            // update $PWD and $OLDPWD
             char cwd[MAX_PATH_LENGTH];
             getcwd(cwd, MAX_PATH_LENGTH);
-            setenv("CWD", cwd, 1);
-            setenv("OLDCWD", last_cwd, 1);
+            setenv("PWD", cwd, 1);
+            setenv("OLDPWD", last_cwd, 1);
         }
     }
 

@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 {
     if (argc != 1)
     {
-        fputs("Does not support any parameters.\n", stderr);
+        fputs("Does not support parameters.\n", stderr);
         return EXIT_FAILURE;
     }
     else
