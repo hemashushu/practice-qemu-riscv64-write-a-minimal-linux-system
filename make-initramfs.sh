@@ -53,6 +53,7 @@ cp ../../apps/applets applets
 
 test -L cat || ln -s applets cat
 test -L tee || ln -s applets tee
+test -L tr || ln -s applets tr
 test -L uname || ln -s applets uname
 test -L poweroff || ln -s applets poweroff
 popd

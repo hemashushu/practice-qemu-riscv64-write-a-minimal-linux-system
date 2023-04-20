@@ -7,21 +7,20 @@
  */
 
 // a program contains multiple applets like BusyBox.
-//
-// cat, ps, poweroff
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <libgen.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 #include <sys/reboot.h>
 
 void print_usage(void)
 {
     char *text =
         "Available applets:\n"
-        "    cat, tee, uname, poweroff\n"
+        "    cat, tee, tr, uname, poweroff\n"
         "\n"
         "Usage:\n"
         "    applets applet_name args0 args1 ...\n"
@@ -29,6 +28,8 @@ void print_usage(void)
         "e.g.\n"
         "    applets cat /path/to/file\n"
         "    applets tee /path/to/file\n"
+        "    applets tr [:upper:] [:lower:]\n"
+        "    applets tr [:blank:] '_'\n"
         "    applets uname\n"
         "    applets poweroff\n"
         "\n"
@@ -43,8 +44,8 @@ void print_usage(void)
 
 int command_cat(char *filepath)
 {
-    FILE *fd = fopen(filepath, "r");
-    if (fd == NULL)
+    FILE *file = fopen(filepath, "r");
+    if (file == NULL)
     {
         perror("fopen");
         return EXIT_FAILURE;
@@ -54,20 +55,20 @@ int command_cat(char *filepath)
     char buf[BUF_SIZE];
     size_t bytes_read;
 
-    while ((bytes_read = fread(buf, 1, BUF_SIZE, fd)) > 0)
+    while ((bytes_read = fread(buf, 1, BUF_SIZE, file)) > 0)
     {
         fputs(buf, stdout);
     }
 
-    fclose(fd);
+    fclose(file);
     return EXIT_SUCCESS;
 }
 
 // read data from stdin and write to the specified file.
 int command_tee(char *filepath)
 {
-    FILE *fd = fopen(filepath, "w");
-    if (fd == NULL)
+    FILE *file = fopen(filepath, "w");
+    if (file == NULL)
     {
         perror("fopen");
         return EXIT_FAILURE;
@@ -75,15 +76,16 @@ int command_tee(char *filepath)
 
     const int BUF_SIZE = 4096;
     char buf[BUF_SIZE];
+
     size_t bytes_read;
 
     while ((bytes_read = fread(buf, 1, BUF_SIZE, stdin)) > 0)
     {
-        size_t bytes_write = fwrite(buf, 1, bytes_read, fd);
+        size_t bytes_write = fwrite(buf, 1, bytes_read, file);
         if (bytes_write < bytes_read)
         {
             perror("fwrite");
-            fclose(fd);
+            fclose(file);
             return EXIT_FAILURE;
         }
 
@@ -94,21 +96,88 @@ int command_tee(char *filepath)
         }
     }
 
-    // char ch;
-    // while ((ch = fgetc(stdin)) != EOF)
-    // {
-    //     fputc(ch, fd);
-    // }
+    fclose(file);
+    return EXIT_SUCCESS;
+}
 
-    fclose(fd);
+bool is_valid_pattern(char *pattern)
+{
+    return strcmp(pattern, "[:blank:]") == 0 ||
+           strcmp(pattern, "[:upper:]") == 0 ||
+           strcmp(pattern, "[:lower:]") == 0 ||
+           strcmp(pattern, "_") == 0;
+}
+
+bool is_match_pattern(char *pattern, char ch)
+{
+    return (strcmp(pattern, "[:blank:]") == 0 && ch == ' ') ||
+           (strcmp(pattern, "[:upper:]") == 0 && (ch >= 'A' && ch <= 'Z')) ||
+           (strcmp(pattern, "[:lower:]") == 0 && (ch >= 'a' && ch <= 'z')) ||
+           (strcmp(pattern, "_") == 0 && ch == '_');
+}
+
+char convert_to(char *pattern, char ch)
+{
+    if (strcmp(pattern, "[:blank:]") == 0)
+    {
+        return ' ';
+    }
+    else if (strcmp(pattern, "[:upper:]") == 0)
+    {
+        return (ch - 32);
+    }
+    else if (strcmp(pattern, "[:lower:]") == 0)
+    {
+        return (ch + 32);
+    }
+    else if (strcmp(pattern, "_") == 0)
+    {
+        return '_';
+    }
+
+    exit(EXIT_FAILURE);
+}
+
+int command_tr(char *find, char *replace)
+{
+    if (!is_valid_pattern(find))
+    {
+        fprintf(stderr,
+                "Pattern \"%s\" is not supported, only pattern '_', [:blank:], [:upper:], [:lower:] are allowed.\n",
+                find);
+        return EXIT_FAILURE;
+    }
+
+    if (!is_valid_pattern(replace))
+    {
+        fprintf(stderr,
+                "Pattern \"%s\" is not supported, only pattern '_', [:blank:], [:upper:], [:lower:] are allowed.\n",
+                replace);
+        return EXIT_FAILURE;
+    }
+
+    char ch;
+    while ((ch = getchar()) != EOF)
+    {
+        if (is_match_pattern(find, ch))
+        {
+            ch = convert_to(replace, ch);
+        }
+        putchar(ch);
+
+        if (feof(stdin) != 0) {
+            break;
+        }
+    }
+
     return EXIT_SUCCESS;
 }
 
 int command_uname(void)
 {
     char *filepath = "/proc/version";
-    FILE *fd = fopen(filepath, "r");
-    if (fd == NULL)
+    FILE *file = fopen(filepath, "r");
+    if (file == NULL)
     {
         perror("fopen");
         fputs("mount /proc first.\n", stderr);
@@ -117,8 +186,8 @@ int command_uname(void)
 
     const int BUF_SIZE = 1024;
     char buf[BUF_SIZE];
-    fread(buf, 1, BUF_SIZE, fd);
-    fclose(fd);
+    fread(buf, 1, BUF_SIZE, file);
+    fclose(file);
 
     fputs(buf, stdout);
     return EXIT_SUCCESS;
@@ -184,6 +253,21 @@ int main(int argc, char **argv)
         }
 
         return command_tee(argv[arg_offset]);
+    }
+    else if (strcmp(command, "tr") == 0)
+    {
+        if (argv[arg_offset] == NULL || argv[arg_offset + 1] == NULL)
+        {
+            fputs("Usages:\n", stderr);
+            fputs("    applets tr [:upper:] [:lower:]\n", stderr);
+            fputs("    applets tr [:blank:] '_'\n", stderr);
+            fputs("or\n", stderr);
+            fputs("    applets tr [:upper:] [:lower:]\n", stderr);
+            fputs("    applets tr [:blank:] '_'\n", stderr);
+            return EXIT_FAILURE;
+        }
+
+        return command_tr(argv[arg_offset], argv[arg_offset + 1]);
     }
     else if (strcmp(command, "uname") == 0)
     {

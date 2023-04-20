@@ -74,8 +74,8 @@ void loop(void)
 
 int run_script(char *filepath)
 {
-    FILE *fd = fopen(filepath, "r");
-    if (fd == NULL)
+    FILE *file = fopen(filepath, "r");
+    if (file == NULL)
     {
         perror("fopen");
         return EXIT_FAILURE;
@@ -84,7 +84,7 @@ int run_script(char *filepath)
     char *line = NULL;
     size_t len = 0;
 
-    while (getline(&line, &len, fd) != -1)
+    while (getline(&line, &len, file) != -1)
     {
         // skip line comment
         if (line[0] == '#')
@@ -98,7 +98,7 @@ int run_script(char *filepath)
     }
 
     free(line);
-    fclose(fd);
+    fclose(file);
 
     return EXIT_SUCCESS;
 }
@@ -139,6 +139,7 @@ char **convert_to_args(char *line)
 
     int i = 0;
     char *token = strtok(line, DELIMITERS);
+
     while (token != NULL)
     {
         tokens[i] = token;
@@ -156,7 +157,7 @@ int execute(char **args)
     char *cmd = args[0];
     if (cmd == NULL)
     {
-        // empty command
+        // empty command, the length of args is 0
         return 1;
     }
     else
