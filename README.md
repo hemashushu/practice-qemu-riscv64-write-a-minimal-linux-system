@@ -1,6 +1,6 @@
-# QEMU RISC-V 64bit - Write a minimal Linux system
+# Write a minimal RISC-V operating system based on Linux kernel
 
-Write simple `shell` and `init` programs, build a minimal RISC-V Linux system, and runs on the QEMU emulator.
+Write simple `shell` and `init` programs, build a minimal RISC-V operating system based on Linux kernel, and runs on the QEMU emulator.
 
 - - -
 
