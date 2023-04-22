@@ -9,23 +9,77 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include <fcntl.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <assert.h>
+
+// simple pipe and redirect are supported
+//
+// pipe:
+//     a | b
+//     a | b | c
+//
+// redirect:
+//     a > output
+//     a < input
+//     a > output < input
+//
+// "< input" must be followed by "> output"
+// "a" can be a pipe, e.g.
+//
+//     a | b | c > output
+//     a | b | c < input
+//     a | b | c > output < input
+//
+// e.g.
+// cat hello.txt > world.txt
+// cat hello.txt | tr [:lower:] [:upper:] | tr [:blank:] _ > HELLO.txt
+
+struct Program
+{
+    int argc;    // number of arguments
+    char **argv; // argv[0] is the program file path
+};
+
+struct Task
+{
+    char *output_filepath;     // NULL for stdout
+    char *input_filepath;      // NULL for stdin
+    int number_of_programs;    // number of programs
+    struct Program **programs; // array of programs
+};
 
 extern char **environ;
+
+const int MAX_PATH_LENGTH = 1024;
+const int MAX_PROGRAMS = 256;
+const int MAX_ARGS = 256;
 
 void loop(void);
 int run_script(char *);
 char *get_current_working_directory(void);
 char *get_command_line(void);
-char **convert_to_args(char *);
-int command_cd(char *dest);
-int command_export(char **args);
-int command_help(void);
-int command_pwd(void);
-int execute(char **);
-int execute_external(char **args);
+struct Task *get_task(char *);
+void free_task(struct Task *);
+char *get_input_filepath(char *);
+char *get_output_filepath(char *);
+struct Program *get_program(char *);
+void free_program(struct Program *);
+void command_cd(char *);
+void command_export(char **);
+void command_help(void);
+void execute_task(struct Task *);
+int execute_program(struct Program *);
+int execute_external(char **);
+
+size_t trim(char *, size_t, const char *);
+char *trim_inplace(char *);
+void test_trim(void);
+void test_trim_inplace(void);
 
 int main(int argc, char **argv)
 {
@@ -40,7 +94,9 @@ int main(int argc, char **argv)
     }
     else
     {
-        fputs("Does not support parameters.\n", stderr);
+        fputs("Usage:\n", stderr);
+        fputs("    sh\n", stderr);
+        fputs("    sh /path/to/script\n", stderr);
         return EXIT_FAILURE;
     }
 }
@@ -48,28 +104,27 @@ int main(int argc, char **argv)
 void loop(void)
 {
     const int MAX_PROMPT_LENGTH = 1024;
-
-    char *line;
-    char **args;
-    char *cwd;
     char prompt[MAX_PROMPT_LENGTH];
 
-    int should_continue_next;
+    char *cwd;
+    char *line;
+    struct Task *task;
 
-    do
+    while (true)
     {
         cwd = get_current_working_directory();
         snprintf(prompt, sizeof(prompt), "%s > ", cwd);
         fputs(prompt, stdout);
 
         line = get_command_line();
-        args = convert_to_args(line);
-        should_continue_next = execute(args);
+        task = get_task(line);
 
+        execute_task(task);
+
+        free_task(task);
         free(cwd);
         free(line);
-        free(args);
-    } while (should_continue_next);
+    }
 }
 
 int run_script(char *filepath)
@@ -92,9 +147,24 @@ int run_script(char *filepath)
             continue;
         }
 
-        char **args = convert_to_args(line);
-        execute(args);
-        free(args);
+        struct Program *program = get_program(line);
+        pid_t pid = execute_program(program);
+
+        if (pid == 0)
+        {
+            // builtin commands
+        }
+        else
+        {
+            // wait until program process exit or is killed
+            int status;
+            do
+            {
+                waitpid(pid, &status, WUNTRACED);
+            } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+        }
+
+        free_program(program);
     }
 
     free(line);
@@ -105,7 +175,6 @@ int run_script(char *filepath)
 
 char *get_current_working_directory(void)
 {
-    const int MAX_PATH_LENGTH = 1024;
     char *path = malloc(MAX_PATH_LENGTH * sizeof(char));
     if (getcwd(path, MAX_PATH_LENGTH) == NULL)
     {
@@ -130,92 +199,281 @@ char *get_command_line(void)
     return line;
 }
 
-char **convert_to_args(char *line)
+struct Task *get_task(char *line)
 {
-    const int MAX_ARGS = 256;
+    char *input_filepath = get_input_filepath(line);
+    char *output_filepath = get_output_filepath(line);
+    char *task_line = trim_inplace(line);
+
+    if (input_filepath != NULL && output_filepath == NULL)
+    {
+        // the "> ..." may be followed by "< ..."
+        output_filepath = get_output_filepath(input_filepath);
+        input_filepath = trim_inplace(input_filepath);
+    }
+
+    const char *DELIMITERS = "|";
+    char **program_lines = malloc(MAX_PROGRAMS * sizeof(char *));
+
+    int count = 0;
+    char *token = strtok(task_line, DELIMITERS);
+
+    while (token != NULL)
+    {
+        program_lines[count] = token;
+        count++;
+        token = strtok(NULL, DELIMITERS);
+    }
+
+    struct Program **programs = malloc(count * sizeof(struct Program *));
+    for (int idx = 0; idx < count; idx++)
+    {
+        programs[idx] = get_program(program_lines[idx]);
+    }
+
+    free(program_lines);
+
+    struct Task *task = malloc(sizeof(*task));
+    task->input_filepath = input_filepath;
+    task->output_filepath = output_filepath;
+    task->number_of_programs = count;
+    task->programs = programs;
+
+    return task;
+}
+
+void free_task(struct Task *task)
+{
+    for (int i = 0; i < task->number_of_programs; i++)
+    {
+        free_program(task->programs[i]);
+    }
+
+    free(task->programs);
+    free(task);
+}
+
+char *get_input_filepath(char *line)
+{
+    char *ptr = strrchr(line, '<');
+    if (ptr != NULL)
+    {
+        *ptr = '\0'; // set NULL terminate
+        char *text = ptr + 1;
+        return trim_inplace(text);
+    }
+    else
+    {
+        return NULL;
+    }
+}
+
+char *get_output_filepath(char *line)
+{
+    char *ptr = strrchr(line, '>');
+    if (ptr != NULL)
+    {
+        *ptr = '\0'; // set NULL terminate
+        char *text = ptr + 1;
+        return trim_inplace(text);
+    }
+    else
+    {
+        return NULL;
+    }
+}
+
+struct Program *get_program(char *line)
+{
     const char *DELIMITERS = " \t\n";
+    char **argv = malloc(MAX_ARGS * sizeof(char *));
 
-    char **tokens = malloc(MAX_ARGS * sizeof(char *));
-
-    int i = 0;
+    int count = 0;
     char *token = strtok(line, DELIMITERS);
 
     while (token != NULL)
     {
-        tokens[i] = token;
-        i++;
+        argv[count] = token;
+        count++;
         token = strtok(NULL, DELIMITERS);
     }
 
-    tokens[i] = NULL;
-    return tokens;
+    // set NULL terminate
+    argv[count] = NULL;
+
+    struct Program *program = malloc(sizeof(*program));
+    program->argc = count;
+    program->argv = argv;
+
+    return program;
 }
 
-int execute(char **args)
+void free_program(struct Program *program)
 {
+    free(program->argv);
+    free(program);
+}
 
-    char *cmd = args[0];
-    if (cmd == NULL)
+void execute_task(struct Task *task)
+{
+    pid_t final_pid = 0;
+
+    // save the stdin and stdout for restore them when task complete
+    int saved_in = dup(0);
+    int saved_out = dup(1);
+
+    int fd_in;
+    int fd_out;
+
+    // get the first input stream
+    if (task->input_filepath != NULL)
     {
-        // empty command, the length of args is 0
-        return 1;
+        fd_in = open(task->input_filepath, O_RDONLY);
+        if (fd_in == -1)
+        {
+            perror("open");
+            return;
+        }
     }
     else
     {
-        // to check builtin commands
+        fd_in = dup(saved_in);
+    }
+
+    for (int idx = 0; idx < task->number_of_programs; idx++)
+    {
+        struct Program *program = task->programs[idx];
+
+        // redirect input stream
+        dup2(fd_in, 0);
+        close(fd_in);
+
+        // set up redirect output stream
+        if (idx == task->number_of_programs - 1)
+        {
+            // it is the last program
+            // get the last output stream
+            if (task->output_filepath != NULL)
+            {
+                //` 0666` is an oct number, the actual permission will be `0666 & umask`
+                fd_out = open(task->output_filepath, O_CREAT | O_TRUNC | O_WRONLY, 0666);
+                if (fd_out == -1)
+                {
+                    perror("open");
+                    return;
+                }
+            }
+            else
+            {
+                fd_out = dup(saved_out);
+            }
+        }
+        else
+        {
+            // redirect output stream to pipe
+            // craete pipe
+            int fd_pipe[2];
+            if (pipe(fd_pipe) != 0)
+            {
+                perror("pipe");
+                return;
+            }
+
+            int fd_writing_port = fd_pipe[1];
+            int fd_reading_port = fd_pipe[0];
+
+            fd_out = fd_writing_port;
+
+            // set the next program input stream
+            fd_in = fd_reading_port;
+        }
+
+        // redirect output stream
+        dup2(fd_out, 1);
+        close(fd_out);
+
+        pid_t pid = execute_program(program);
+
+        if (pid != 0)
+        {
+            // only keep the PID which is not builtin command
+            final_pid = pid;
+        }
+    }
+
+    // restore the saved stdin and stdout
+    dup2(saved_in, 0);
+    dup2(saved_out, 1);
+    close(saved_in);
+    close(saved_out);
+
+    if (final_pid != 0)
+    {
+        // wait until the last program process exit or is killed
+        int status;
+        do
+        {
+            waitpid(final_pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
+}
+
+// return 0 if program is the builtin function
+pid_t execute_program(struct Program *program)
+{
+    if (program->argc == 0)
+    {
+        // empty command, the length of argv is 0
+        return 0;
+    }
+    else
+    {
+        char *cmd = program->argv[0];
+
+        // builtin commands
         // https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html
+
         if (strcmp(cmd, "cd") == 0)
         {
             // change the current working directory
-            return command_cd(args[1]);
-        }
-        else if (strcmp(cmd, "exit") == 0)
-        {
-            // exit the current shell
+            command_cd(program->argv[1]);
             return 0;
         }
         else if (strcmp(cmd, "export") == 0)
         {
             // set environment variable
-            return command_export(args);
+            command_export(program->argv);
+            return 0;
         }
         else if (strcmp(cmd, "help") == 0)
         {
             // print help information
-            return command_help();
+            command_help();
+            return 0;
         }
-        else if (strcmp(cmd, "pwd") == 0)
+        else if (strcmp(cmd, "exit") == 0)
         {
-            // print the current working directory
-            return command_pwd();
+            // exit the current shell
+            exit(EXIT_SUCCESS);
         }
         else
         {
             // execute external program
-            return execute_external(args);
+            return execute_external(program->argv);
         }
     }
 }
 
-int command_cd(char *dest)
+void command_cd(char *dest)
 {
     if (dest == NULL)
     {
         // change to $HOME directory
         dest = getenv("HOME");
     }
-    else if (strcmp(dest, "-") == 0)
-    {
-        // change to $OLDPWD directory
-        dest = getenv("OLDPWD");
-    }
 
     if (dest != NULL)
     {
-        const int MAX_PATH_LENGTH = 1024;
-        char last_cwd[MAX_PATH_LENGTH];
-        getcwd(last_cwd, MAX_PATH_LENGTH);
-
         // change to `dest` directory
         if (chdir(dest) != 0)
         {
@@ -223,26 +481,22 @@ int command_cd(char *dest)
         }
         else
         {
-            // update $PWD and $OLDPWD
+            // update $PWD
             char cwd[MAX_PATH_LENGTH];
             getcwd(cwd, MAX_PATH_LENGTH);
             setenv("PWD", cwd, 1);
-            setenv("OLDPWD", last_cwd, 1);
         }
     }
-
-    return 1;
 }
 
-int command_help(void)
+void command_help(void)
 {
     puts("Shell 1.0");
-    return 1;
 }
 
-int command_export(char **args)
+void command_export(char **argv)
 {
-    if (args[1] == NULL)
+    if (argv[1] == NULL)
     {
         // list all environment varables
         for (char **idx = environ; *idx != NULL; idx++)
@@ -250,7 +504,7 @@ int command_export(char **args)
             puts(*idx);
         }
     }
-    else if (args[2] != NULL)
+    else if (argv[2] != NULL)
     {
         fputs("Usage:\n", stderr);
         fputs("    export\n", stderr);
@@ -258,7 +512,7 @@ int command_export(char **args)
     }
     else
     {
-        char *kvp = args[1];
+        char *kvp = argv[1];
         char *copied = malloc(strlen(kvp) + 1);
         strcpy(copied, kvp);
         if (putenv(copied) != 0)
@@ -266,39 +520,153 @@ int command_export(char **args)
             perror("putenv");
         }
     }
-
-    return 1;
 }
 
-int command_pwd(void)
-{
-    char *cwd = get_current_working_directory();
-    printf("%s\n", cwd);
-    free(cwd);
-    return 1;
-}
-
-int execute_external(char **args)
+pid_t execute_external(char **argv)
 {
     pid_t pid = fork();
 
     if (pid == 0)
     {
-        // child process start ---------------------
-        execvp(args[0], args);
+        // child process
         // execve nerver return unless error occured.
+        execvp(argv[0], argv);
         perror("execvp");
         exit(EXIT_FAILURE);
-        // child process end -----------------------
     }
-    else if (pid > 0) // parent process
+    else if (pid > 0)
     {
-        int status;
-        do
-        {
-            waitpid(pid, &status, WUNTRACED);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status)); // when child process is exited or killed
+        // parent process
+        return pid;
+    }
+    else
+    {
+        // failed to fork
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+}
+
+size_t trim(char *buf, size_t buf_len, const char *str)
+{
+    if (buf_len == 0)
+    {
+        return 0;
     }
 
-    return 1;
+    // Trim leading space
+    const char *start_ptr = str;
+    while (isspace((unsigned char)*start_ptr))
+    {
+        start_ptr++;
+    }
+
+    if (*start_ptr == 0)
+    {
+        // all characters are space
+        *buf = 0;
+        return 0;
+    }
+
+    // Trim trailing space
+    const char *end_ptr = start_ptr + strlen(start_ptr) - 1;
+    while (end_ptr > start_ptr && isspace((unsigned char)*end_ptr))
+    {
+        end_ptr--;
+    }
+
+    size_t actual_len = end_ptr - start_ptr + 1;
+
+    // truncate the string if the buffer size is smaller than the actual size
+    size_t copy_size = (actual_len < buf_len - 1) ? actual_len : (buf_len - 1);
+
+    memcpy(buf, start_ptr, copy_size);
+
+    // set null terminator
+    buf[copy_size] = 0;
+
+    return copy_size;
+}
+
+char *trim_inplace(char *str)
+{
+    char *start_ptr = str;
+    while (isspace((unsigned char)*start_ptr))
+    {
+        start_ptr++;
+    }
+
+    if (*start_ptr == 0)
+    {
+        // all characters are space
+        return start_ptr;
+    }
+
+    char *end_ptr = start_ptr + strlen(start_ptr) - 1;
+    while (end_ptr > start_ptr && isspace((unsigned char)*end_ptr))
+    {
+        end_ptr--;
+    }
+
+    // set null terminator
+    end_ptr[1] = '\0';
+    return start_ptr;
+}
+
+void test_trim(void)
+{
+    const size_t buf_len = 10;
+    char buf[buf_len];
+
+    assert(trim(buf, buf_len, "hello") == 5);
+    assert(strcmp(buf, "hello") == 0);
+
+    assert(trim(buf, buf_len, "foo  ") == 3);
+    assert(strcmp(buf, "foo") == 0);
+
+    assert(trim(buf, buf_len, "  world") == 5);
+    assert(strcmp(buf, "world") == 0);
+
+    assert(trim(buf, buf_len, " bar ") == 3);
+    assert(strcmp(buf, "bar") == 0);
+
+    assert(trim(buf, buf_len, "    ") == 0);
+    assert(strcmp(buf, "") == 0);
+
+    // buffer length is 10, which can only contains 9 characters.
+    assert(trim(buf, buf_len, "   hello world   ") == 9);
+    assert(strcmp(buf, "hello wor") == 0);
+}
+
+char *to_mut_string(const char *str)
+{
+    int len = strlen(str);
+    char *mut_str = malloc(len + 1);
+    memcpy(mut_str, str, len);
+    return mut_str;
+}
+
+void test_trim_inplace(void)
+{
+    char *mut_str;
+
+    mut_str = to_mut_string("hello");
+    assert(strcmp(trim_inplace(mut_str), "hello") == 0);
+    free(mut_str);
+
+    mut_str = to_mut_string("foo  ");
+    assert(strcmp(trim_inplace(mut_str), "foo") == 0);
+    free(mut_str);
+
+    mut_str = to_mut_string("  world");
+    assert(strcmp(trim_inplace(mut_str), "world") == 0);
+    free(mut_str);
+
+    mut_str = to_mut_string(" bar ");
+    assert(strcmp(trim_inplace(mut_str), "bar") == 0);
+    free(mut_str);
+
+    mut_str = to_mut_string("    ");
+    assert(strcmp(trim_inplace(mut_str), "") == 0);
+    free(mut_str);
 }

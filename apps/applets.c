@@ -57,7 +57,7 @@ int command_cat(char *filepath)
 
     while ((bytes_read = fread(buf, 1, BUF_SIZE, file)) > 0)
     {
-        fputs(buf, stdout);
+        fwrite(buf, 1, bytes_read, stdout);
     }
 
     fclose(file);
@@ -159,12 +159,18 @@ int command_tr(char *find, char *replace)
     char ch;
     while ((ch = getchar()) != EOF)
     {
+        char result;
+
         if (is_match_pattern(find, ch))
         {
-            ch = convert_to(replace, ch);
+            result = convert_to(replace, ch);
+        }else {
+            result = ch;
         }
-        putchar(ch);
 
+        putchar(result);
+
+        // fix QEMU terminate buffer
         if (feof(stdin) != 0) {
             break;
         }

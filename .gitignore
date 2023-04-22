@@ -10,6 +10,7 @@ apps/init
 apps/sh
 apps/mount
 apps/umount
+apps/pwd
 apps/ls
 apps/applets
 

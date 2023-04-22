@@ -6,6 +6,7 @@ riscv64-linux-gnu-gcc -g -Wall -static -o init init.c
 riscv64-linux-gnu-gcc -g -Wall -static -o sh sh.c
 riscv64-linux-gnu-gcc -g -Wall -static -o mount mount.c
 riscv64-linux-gnu-gcc -g -Wall -static -o umount umount.c
+riscv64-linux-gnu-gcc -g -Wall -static -o pwd pwd.c
 riscv64-linux-gnu-gcc -g -Wall -static -o ls ls.c
 riscv64-linux-gnu-gcc -g -Wall -static -o applets applets.c
 popd
@@ -24,9 +25,7 @@ mkdir -p sys
 mkdir -p run
 mkdir -p dev
 
-cat > root/hello.txt << "EOF"
-Hello, My own Linux system!
-EOF
+echo "Hello, My own Linux system!" > root/hello.txt
 
 cat << "EOF" > etc/rc
 #!/bin/sh
@@ -48,6 +47,7 @@ cp ../../apps/init init
 cp ../../apps/sh sh
 cp ../../apps/mount mount
 cp ../../apps/umount umount
+cp ../../apps/pwd pwd
 cp ../../apps/ls ls
 cp ../../apps/applets applets
 
