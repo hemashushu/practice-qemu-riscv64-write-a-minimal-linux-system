@@ -9,6 +9,7 @@ riscv64-linux-gnu-gcc -g -Wall -static -o umount umount.c
 riscv64-linux-gnu-gcc -g -Wall -static -o pwd pwd.c
 riscv64-linux-gnu-gcc -g -Wall -static -o ls ls.c
 riscv64-linux-gnu-gcc -g -Wall -static -o applets applets.c
+riscv64-linux-gnu-gcc -g -Wall -static -o fork-test fork-test.c
 popd
 
 mkdir -p initramfs
@@ -50,6 +51,7 @@ cp ../../apps/umount umount
 cp ../../apps/pwd pwd
 cp ../../apps/ls ls
 cp ../../apps/applets applets
+cp ../../apps/fork-test fork-test
 
 test -L cat || ln -s applets cat
 test -L tee || ln -s applets tee

@@ -13,6 +13,7 @@ apps/umount
 apps/pwd
 apps/ls
 apps/applets
+apps/fork-test
 
 initramfs
 initramfs.cpio.gz
