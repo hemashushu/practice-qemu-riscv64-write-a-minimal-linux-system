@@ -1,10 +1,4 @@
 {
     "files.associations": {
-        "*.excalidraw": "json",
-        "*.excalidrawlib": "json",
-        "*.S": "asm-intel-x86-generic",
-        "types.h": "c",
-        "dirent.h": "c",
-        "stdbool.h": "c"
     }
 }

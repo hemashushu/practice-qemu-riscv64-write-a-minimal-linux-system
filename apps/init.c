@@ -27,7 +27,7 @@ int main(void)
 
     // the `init` process is launched directly by the kernel,
     // the value of PID should be 1.
-
+    // check APUE chapter 8.2
     if (getpid() != 1)
     {
         // this process is launched incorrectly.
@@ -56,9 +56,10 @@ int main(void)
 
             // the `wait()` function return the `pid` of the exited child process.
             //
-            // note the child processes includes the `/etc/rc` process which
+            // note that the _child processes_ includes the `/etc/rc` process which
             // is started directly by the `init` process, and all other
             // processes that have lose their parents, i.e. orphan processes.
+            // check APUE chapter 9.10
             //
             // the `wait()` function will be blocked until a child process exits.
             //
@@ -67,23 +68,35 @@ int main(void)
         }
 
         // parent process wouldn't stop until system shut down
-
     }
     else if (child_pid == 0)
     {
         // child process start here
 
+        // undo the signal blocking that set by the parent process.
         sigprocmask(SIG_UNBLOCK, &set, NULL);
 
+        // start new session.
+        // a session consists of multiple process groups,
+        // typical one foreground process group and one or more background process gorup.
+        //
+        // setpgid(0, 0);
+        // create a new process group (with the current pid as group id)
+        // a process group consists of one or multiple processes, process group is used
+        // for job control (implemented through the shell), there are several job control commands:
+        // e.g.
+        // bg: puts group in the background
+        // fg: brings backgroud group to the foreground
+        // note that `setsid()` implies `setpgid(0, 0)`
+        // check APUE chapter 9.6
         setsid();
-        // setpgid(0, 0); // optional
 
-        chdir("/root");
+        chdir("/");
 
         char *envp[] = {"USER=root",
                         "HOME=/root",
                         "SHELL=/bin/sh",
-                        "PWD=/root",
+                        "PWD=/",
                         "PATH=/bin:/sbin",
                         NULL};
 
@@ -98,7 +111,6 @@ int main(void)
         // execve nerver return unless error occured.
         perror("execve");
         exit(EXIT_FAILURE);
-
     }
     else
     {

@@ -8,10 +8,8 @@ Write simple `shell` and `init` programs, build a minimal RISC-V operating syste
 
 <!-- code_chunk_output -->
 
-- [1.](#1)
+- [1. TODO::](#1-todo)
 
 <!-- /code_chunk_output -->
 
-## 1.
-
-TODO::
+## 1. TODO::

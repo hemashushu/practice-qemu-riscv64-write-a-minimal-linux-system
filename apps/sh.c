@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <assert.h>
@@ -51,6 +52,7 @@ struct Task
     char *input_filepath;      // NULL for stdin
     int number_of_programs;    // number of programs
     struct Program **programs; // array of programs
+    bool is_background;        // indicates do not wait for the last program to finish
 };
 
 extern char **environ;
@@ -59,12 +61,15 @@ const int MAX_PATH_LENGTH = 1024;
 const int MAX_PROGRAMS = 256;
 const int MAX_ARGS = 256;
 
+// functions prototypes
+
 void loop(void);
 int run_script(char *);
 char *get_current_working_directory(void);
 char *get_command_line(void);
 struct Task *get_task(char *);
 void free_task(struct Task *);
+bool check_background_operator(char *);
 char *get_input_filepath(char *);
 char *get_output_filepath(char *);
 struct Program *get_program(char *);
@@ -75,7 +80,6 @@ void command_help(void);
 void execute_task(struct Task *);
 int execute_program(struct Program *);
 int execute_external(char **);
-
 size_t trim(char *, size_t, const char *);
 char *trim_inplace(char *);
 void test_trim(void);
@@ -147,24 +151,9 @@ int run_script(char *filepath)
             continue;
         }
 
-        struct Program *program = get_program(line);
-        pid_t pid = execute_program(program);
-
-        if (pid == 0)
-        {
-            // builtin commands
-        }
-        else
-        {
-            // wait until program process exit or is killed
-            int status;
-            do
-            {
-                waitpid(pid, &status, WUNTRACED);
-            } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-        }
-
-        free_program(program);
+        struct Task *task = get_task(line);
+        execute_task(task);
+        free_task(task);
     }
 
     free(line);
@@ -201,6 +190,7 @@ char *get_command_line(void)
 
 struct Task *get_task(char *line)
 {
+    bool is_background = check_background_operator(line);
     char *input_filepath = get_input_filepath(line);
     char *output_filepath = get_output_filepath(line);
     char *task_line = trim_inplace(line);
@@ -238,6 +228,7 @@ struct Task *get_task(char *line)
     task->output_filepath = output_filepath;
     task->number_of_programs = count;
     task->programs = programs;
+    task->is_background = is_background;
 
     return task;
 }
@@ -251,6 +242,31 @@ void free_task(struct Task *task)
 
     free(task->programs);
     free(task);
+}
+
+bool check_background_operator(char *line)
+{
+    int len = strlen(line);
+    bool result = false;
+
+    for (int i = len - 1; i > 0; i--)
+    {
+        if (isspace(line[i]))
+        {
+            continue;
+        }
+        else
+        {
+            if (line[i] == '&')
+            {
+                result = true;
+                line[i] = '\0';
+            }
+            break;
+        }
+    }
+
+    return result;
 }
 
 char *get_input_filepath(char *line)
@@ -316,6 +332,39 @@ void free_program(struct Program *program)
 
 void execute_task(struct Task *task)
 {
+    // parent process (the current process)
+    //  |
+    //  |           first input stream
+    //  |            |
+    //  |-- fork/exec 1st program
+    //  |            | pipe 0
+    //  |-- fork/exec 2st program
+    //  |            | pipe 1
+    //  |-- fork/exec 3st program
+    //               |
+    //              last output stream
+    //
+    // it's slightly different from the Bourne shell, which
+    // fork and create the first child process, then fork and exec
+    // all programs (except the last one) in the first child process,
+    // at last the first child process exec the last program.
+    //
+    // parent process (the current process)
+    //  |
+    //  |-- fork, child process
+    //        |
+    //        |           first input stream
+    //        |            |
+    //        |-- fork/exec 1st program
+    //        |            | pipe 0
+    //        |-- fork/exec 2st program
+    //        |            | pipe 1
+    //        |-- exec 3st program
+    //                     |
+    //                    last output stream
+    //
+    // check APUE chapter 9.9
+
     pid_t final_pid = 0;
 
     // save the stdin and stdout for restore them when task complete
@@ -394,7 +443,7 @@ void execute_task(struct Task *task)
 
         pid_t pid = execute_program(program);
 
-        if (pid != 0)
+        if (!task->is_background && pid != 0)
         {
             // only keep the PID which is not builtin command
             final_pid = pid;
@@ -453,8 +502,19 @@ pid_t execute_program(struct Program *program)
         }
         else if (strcmp(cmd, "exit") == 0)
         {
-            // exit the current shell
-            exit(EXIT_SUCCESS);
+            if (getppid() == 1)
+            {
+                // when the parent PID == 1, it means
+                // the current process is the only shell.
+                fputs("Can not exit to init.\n", stderr);
+                fputs("You may shutdown system through execute command `poweroff`.\n", stderr);
+                return 0;
+            }
+            else
+            {
+                // exit the current shell
+                exit(EXIT_SUCCESS);
+            }
         }
         else
         {

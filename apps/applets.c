@@ -27,9 +27,12 @@ void print_usage(void)
         "\n"
         "e.g.\n"
         "    applets cat /path/to/file\n"
+        "    applets cat file1 file2 ...\n"
+        "    applets cat\n"
         "    applets tee /path/to/file\n"
+        "    applets tee\n"
         "    applets tr [:upper:] [:lower:]\n"
-        "    applets tr [:blank:] '_'\n"
+        "    applets tr [:blank:] _\n"
         "    applets uname\n"
         "    applets poweroff\n"
         "\n"
@@ -42,36 +45,79 @@ void print_usage(void)
     fputs(text, stderr);
 }
 
-int command_cat(char *filepath)
+/**
+ * @brief Read from file(s) and print to stdout, if no file was specified, then read from stdin.
+ *
+ *  Usage:
+ *      applets cat
+ *      applets cat /path/to/name
+ *      applets cat file1 file2 ...
+ *  or
+ *      cat
+ *      cat /path/to/name
+ *      cat file1 file2 ...
+ *
+ * @param filepath
+ * @return int
+ */
+int command_cat(char **filepath)
 {
-    FILE *file = fopen(filepath, "r");
-    if (file == NULL)
-    {
-        perror("fopen");
-        return EXIT_FAILURE;
-    }
-
     const int BUF_SIZE = 4096;
     char buf[BUF_SIZE];
     size_t bytes_read;
 
-    while ((bytes_read = fread(buf, 1, BUF_SIZE, file)) > 0)
+    if (*filepath == NULL)
     {
-        fwrite(buf, 1, bytes_read, stdout);
+        // read from stdin
+        while ((bytes_read = fread(buf, 1, BUF_SIZE, stdin)) > 0)
+        {
+            fwrite(buf, 1, bytes_read, stdout);
+        }
+    }
+    else
+    {
+        while (*filepath != NULL)
+        {
+            FILE *file = fopen(*filepath, "r");
+            if (file == NULL)
+            {
+                perror("fopen");
+                return EXIT_FAILURE;
+            }
+
+            while ((bytes_read = fread(buf, 1, BUF_SIZE, file)) > 0)
+            {
+                fwrite(buf, 1, bytes_read, stdout);
+            }
+
+            fclose(file);
+
+            // next file
+            filepath++;
+        }
     }
 
-    fclose(file);
     return EXIT_SUCCESS;
 }
 
-// read data from stdin and write to the specified file.
+/**
+ * @brief Read data from stdin and write to both the specified file and stdout.
+ *
+ * @param filepath optional
+ * @return int
+ */
 int command_tee(char *filepath)
 {
-    FILE *file = fopen(filepath, "w");
-    if (file == NULL)
+    FILE *file = NULL;
+
+    if (filepath != NULL)
     {
-        perror("fopen");
-        return EXIT_FAILURE;
+        file = fopen(filepath, "w");
+        if (file == NULL)
+        {
+            perror("fopen");
+            return EXIT_FAILURE;
+        }
     }
 
     const int BUF_SIZE = 4096;
@@ -81,12 +127,19 @@ int command_tee(char *filepath)
 
     while ((bytes_read = fread(buf, 1, BUF_SIZE, stdin)) > 0)
     {
-        size_t bytes_write = fwrite(buf, 1, bytes_read, file);
-        if (bytes_write < bytes_read)
+        // write to stdout
+        fwrite(buf, 1, bytes_read, stdout);
+
+        // write to the specified file
+        if (file != NULL)
         {
-            perror("fwrite");
-            fclose(file);
-            return EXIT_FAILURE;
+            size_t bytes_write = fwrite(buf, 1, bytes_read, file);
+            if (bytes_write < bytes_read)
+            {
+                perror("fwrite");
+                fclose(file);
+                return EXIT_FAILURE;
+            }
         }
 
         if (feof(stdin) != 0)
@@ -96,7 +149,10 @@ int command_tee(char *filepath)
         }
     }
 
-    fclose(file);
+    if (file != NULL)
+    {
+        fclose(file);
+    }
     return EXIT_SUCCESS;
 }
 
@@ -138,6 +194,13 @@ char convert_to(char *pattern, char ch)
     exit(EXIT_FAILURE);
 }
 
+/**
+ * @brief Find and replace string
+ *
+ * @param find
+ * @param replace
+ * @return int
+ */
 int command_tr(char *find, char *replace)
 {
     if (!is_valid_pattern(find))
@@ -164,14 +227,17 @@ int command_tr(char *find, char *replace)
         if (is_match_pattern(find, ch))
         {
             result = convert_to(replace, ch);
-        }else {
+        }
+        else
+        {
             result = ch;
         }
 
         putchar(result);
 
         // fix QEMU terminate buffer
-        if (feof(stdin) != 0) {
+        if (feof(stdin) != 0)
+        {
             break;
         }
     }
@@ -236,24 +302,17 @@ int main(int argc, char **argv)
 
     if (strcmp(command, "cat") == 0)
     {
-        if (argv[arg_offset] == NULL)
-        {
-            fputs("Usage:\n", stderr);
-            fputs("    applets cat /path/to/name\n", stderr);
-            fputs("or\n", stderr);
-            fputs("    cat /path/to/name\n", stderr);
-            return EXIT_FAILURE;
-        }
-
-        return command_cat(argv[arg_offset]);
+        return command_cat(argv + arg_offset);
     }
     else if (strcmp(command, "tee") == 0)
     {
-        if (argv[arg_offset] == NULL)
+        if (argc - arg_offset > 1)
         {
             fputs("Usage:\n", stderr);
+            fputs("    applets tee\n", stderr);
             fputs("    applets tee /path/to/name\n", stderr);
             fputs("or\n", stderr);
+            fputs("    tee\n", stderr);
             fputs("    tee /path/to/name\n", stderr);
             return EXIT_FAILURE;
         }
@@ -266,10 +325,10 @@ int main(int argc, char **argv)
         {
             fputs("Usages:\n", stderr);
             fputs("    applets tr [:upper:] [:lower:]\n", stderr);
-            fputs("    applets tr [:blank:] '_'\n", stderr);
+            fputs("    applets tr [:blank:] _\n", stderr);
             fputs("or\n", stderr);
-            fputs("    applets tr [:upper:] [:lower:]\n", stderr);
-            fputs("    applets tr [:blank:] '_'\n", stderr);
+            fputs("    tr [:upper:] [:lower:]\n", stderr);
+            fputs("    tr [:blank:] _\n", stderr);
             return EXIT_FAILURE;
         }
 

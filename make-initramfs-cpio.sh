@@ -38,7 +38,8 @@ mount -t tmpfs tmpfs /run
 mount -t devtmpfs devtmpfs /dev
 
 # start an interactive shell
-/bin/sh
+cd /root
+/bin/sh &
 EOF
 
 chmod +x etc/rc
