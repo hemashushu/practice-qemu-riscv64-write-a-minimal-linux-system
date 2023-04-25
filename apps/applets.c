@@ -48,15 +48,6 @@ void print_usage(void)
 /**
  * @brief Read from file(s) and print to stdout, if no file was specified, then read from stdin.
  *
- *  Usage:
- *      applets cat
- *      applets cat /path/to/name
- *      applets cat file1 file2 ...
- *  or
- *      cat
- *      cat /path/to/name
- *      cat file1 file2 ...
- *
  * @param filepath
  * @return int
  */
@@ -275,11 +266,9 @@ int command_poweroff(void)
 int main(int argc, char **argv)
 {
     char *filepath = argv[0];
-    char *base_name = basename(filepath);
+    char *command = basename(filepath);
 
-    char *command;
-    int arg_offset;
-    if (strcmp(base_name, "applets") == 0)
+    if (strcmp(command, "applets") == 0)
     {
         if (argc == 1)
         {
@@ -287,26 +276,35 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        // argv[1] argv[2] argv[3]
-        // command arg0    arg1
-        command = argv[1];
-        arg_offset = 2;
-    }
-    else
-    {
+        // convert
+        //
+        // argv[0] argv[1] argv[2] argv[3]
+        // applets command arg0    arg1
+        //
+        //    |
+        //    V
+        //
         // argv[0]  argv[1] argv[2]
         // command  arg0    arg1
-        command = base_name;
-        arg_offset = 1;
+
+        argv++;
+        argc--;
+        command = argv[0];
     }
 
     if (strcmp(command, "cat") == 0)
     {
-        return command_cat(argv + arg_offset);
+        // usage:
+        //
+        // cat
+        // cat filename
+        // cat file1 file2 ...
+        char **filepaths = argv + 1;
+        return command_cat(filepaths);
     }
     else if (strcmp(command, "tee") == 0)
     {
-        if (argc - arg_offset > 1)
+        if (argc > 2)
         {
             fputs("Usage:\n", stderr);
             fputs("    applets tee\n", stderr);
@@ -317,12 +315,17 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        return command_tee(argv[arg_offset]);
+        // usage:
+        //
+        // tee
+        // tee filename
+        return command_tee(argv[1]);
     }
     else if (strcmp(command, "tr") == 0)
     {
-        if (argv[arg_offset] == NULL || argv[arg_offset + 1] == NULL)
+        if (argc != 3)
         {
+
             fputs("Usages:\n", stderr);
             fputs("    applets tr [:upper:] [:lower:]\n", stderr);
             fputs("    applets tr [:blank:] _\n", stderr);
@@ -332,20 +335,35 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        return command_tr(argv[arg_offset], argv[arg_offset + 1]);
+        // usage:
+        //
+        // tr pattern1 pattern2
+        return command_tr(argv[1], argv[2]);
     }
     else if (strcmp(command, "uname") == 0)
     {
-        if (argv[arg_offset] != NULL)
+        if (argc != 1)
         {
             fputs("Does not support parameters.\n", stderr);
             return EXIT_FAILURE;
         }
 
+        // usage:
+        //
+        // uname
         return command_uname();
     }
     else if (strcmp(command, "poweroff") == 0)
     {
+        if (argc != 1)
+        {
+            fputs("Does not support parameters.\n", stderr);
+            return EXIT_FAILURE;
+        }
+
+        // usage:
+        //
+        // poweroff
         return command_poweroff();
     }
     else

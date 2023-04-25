@@ -15,11 +15,13 @@
 
 int list_mounts(void)
 {
-    const int MAX_FILE_PATH_LENGTH = 1024;
 
-    pid_t pid = getpid();
-    char filepath[MAX_FILE_PATH_LENGTH];
-    sprintf(filepath, "/proc/%d/mounts", pid);
+//     const int MAX_FILE_PATH_LENGTH = 1024;
+//     pid_t pid = getpid();
+//     char filepath[MAX_FILE_PATH_LENGTH];
+//     sprintf(filepath, "/proc/%d/mounts", pid);
+
+    char* filepath = "/proc/self/mounts";
 
     FILE *file = fopen(filepath, "r");
     if (file == NULL)

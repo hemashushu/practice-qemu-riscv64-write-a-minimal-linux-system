@@ -123,9 +123,12 @@ void loop(void)
         line = get_command_line();
         task = get_task(line);
 
-        execute_task(task);
+        if (task != NULL)
+        {
+            execute_task(task);
+            free_task(task);
+        }
 
-        free_task(task);
         free(cwd);
         free(line);
     }
@@ -145,15 +148,12 @@ int run_script(char *filepath)
 
     while (getline(&line, &len, file) != -1)
     {
-        // skip line comment
-        if (line[0] == '#')
-        {
-            continue;
-        }
-
         struct Task *task = get_task(line);
-        execute_task(task);
-        free_task(task);
+        if (task != NULL)
+        {
+            execute_task(task);
+            free_task(task);
+        }
     }
 
     free(line);
@@ -188,8 +188,17 @@ char *get_command_line(void)
     return line;
 }
 
+// return NULL when the line is comment.
 struct Task *get_task(char *line)
 {
+    line = trim_inplace(line);
+
+    // line comment
+    if (line[0] == '#')
+    {
+        return NULL;
+    }
+
     bool is_background = check_background_operator(line);
     char *input_filepath = get_input_filepath(line);
     char *output_filepath = get_output_filepath(line);
@@ -479,7 +488,12 @@ pid_t execute_program(struct Program *program)
     {
         char *cmd = program->argv[0];
 
-        // builtin commands
+        // builtin commands:
+        // cd, export, exit, help
+        //
+        // unimplement:
+        // source(.), set
+        //
         // https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html
 
         if (strcmp(cmd, "cd") == 0)
