@@ -20,15 +20,12 @@ void print_usage(void)
 {
     char *text =
         "Available applets:\n"
-        "    cat, tee, tr, uname, poweroff\n"
+        "    tee, tr, uname, poweroff\n"
         "\n"
         "Usage:\n"
         "    applets applet_name args0 args1 ...\n"
         "\n"
         "e.g.\n"
-        "    applets cat /path/to/file\n"
-        "    applets cat file1 file2 ...\n"
-        "    applets cat\n"
         "    applets tee /path/to/file\n"
         "    applets tee\n"
         "    applets tr [:upper:] [:lower:]\n"
@@ -43,52 +40,6 @@ void print_usage(void)
         "      Hello World!\n"
         "      ^D\n";
     fputs(text, stderr);
-}
-
-/**
- * @brief Read from file(s) and print to stdout, if no file was specified, then read from stdin.
- *
- * @param filepath
- * @return int
- */
-int command_cat(char **filepath)
-{
-    const int BUF_SIZE = 4096;
-    char buf[BUF_SIZE];
-    size_t bytes_read;
-
-    if (*filepath == NULL)
-    {
-        // read from stdin
-        while ((bytes_read = fread(buf, 1, BUF_SIZE, stdin)) > 0)
-        {
-            fwrite(buf, 1, bytes_read, stdout);
-        }
-    }
-    else
-    {
-        while (*filepath != NULL)
-        {
-            FILE *file = fopen(*filepath, "r");
-            if (file == NULL)
-            {
-                perror("fopen");
-                return EXIT_FAILURE;
-            }
-
-            while ((bytes_read = fread(buf, 1, BUF_SIZE, file)) > 0)
-            {
-                fwrite(buf, 1, bytes_read, stdout);
-            }
-
-            fclose(file);
-
-            // next file
-            filepath++;
-        }
-    }
-
-    return EXIT_SUCCESS;
 }
 
 /**
@@ -292,17 +243,7 @@ int main(int argc, char **argv)
         command = argv[0];
     }
 
-    if (strcmp(command, "cat") == 0)
-    {
-        // usage:
-        //
-        // cat
-        // cat filename
-        // cat file1 file2 ...
-        char **filepaths = argv + 1;
-        return command_cat(filepaths);
-    }
-    else if (strcmp(command, "tee") == 0)
+    if (strcmp(command, "tee") == 0)
     {
         if (argc > 2)
         {

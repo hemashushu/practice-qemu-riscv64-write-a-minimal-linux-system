@@ -79,6 +79,8 @@ int main(void)
         // start new session.
         // a session consists of multiple process groups,
         // typical one foreground process group and one or more background process gorup.
+        // each tty a session.
+        // check _The Linux Programming Interface_ chapter 2.14
         //
         // setpgid(0, 0);
         // create a new process group (with the current pid as group id)
@@ -97,7 +99,7 @@ int main(void)
                         "HOME=/root",
                         "SHELL=/bin/sh",
                         "PWD=/",
-                        "PATH=/bin:/sbin",
+                        "PATH=/bin:/sbin:/usr/bin:/usr/sbin",
                         NULL};
 
         // execute the shell program

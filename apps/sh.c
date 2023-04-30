@@ -353,10 +353,12 @@ void execute_task(struct Task *task)
     //               |
     //              last output stream
     //
-    // it's slightly different from the Bourne shell, which
+    // it's slightly different from the Bourne again shell (Bash), which
     // fork and create the first child process, then fork and exec
     // all programs (except the last one) in the first child process,
     // at last the first child process exec the last program.
+    // the first child process will create a new process group, thus
+    // all child processes run in one process group.
     //
     // parent process (the current process)
     //  |

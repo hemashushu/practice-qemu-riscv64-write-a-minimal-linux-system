@@ -7,6 +7,7 @@ riscv64-linux-gnu-gcc -g -Wall -static -o sh sh.c
 riscv64-linux-gnu-gcc -g -Wall -static -o mount mount.c
 riscv64-linux-gnu-gcc -g -Wall -static -o umount umount.c
 riscv64-linux-gnu-gcc -g -Wall -static -o pwd pwd.c
+riscv64-linux-gnu-gcc -g -Wall -static -o cat cat.c
 riscv64-linux-gnu-gcc -g -Wall -static -o ls ls.c
 riscv64-linux-gnu-gcc -g -Wall -static -o applets applets.c
 riscv64-linux-gnu-gcc -g -Wall -static -o fork-test fork-test.c
@@ -17,6 +18,8 @@ mkdir -p initramfs
 pushd initramfs
 
 mkdir -p bin
+mkdir -p sbin
+mkdir -p usr/bin
 mkdir -p etc
 mkdir -p root
 mkdir -p proc
@@ -25,6 +28,7 @@ mkdir -p proc
 mkdir -p sys
 mkdir -p run
 mkdir -p dev
+mkdir -p opt
 
 echo "Hello, My own Linux system!" > root/hello.txt
 
@@ -44,21 +48,29 @@ EOF
 
 chmod +x etc/rc
 
-pushd bin
+pushd sbin
 cp ../../apps/init init
-cp ../../apps/sh sh
 cp ../../apps/mount mount
 cp ../../apps/umount umount
+popd
+
+pushd bin
+cp ../../apps/sh sh
 cp ../../apps/pwd pwd
 cp ../../apps/ls ls
-cp ../../apps/applets applets
-cp ../../apps/fork-test fork-test
+cp ../../apps/cat cat
+popd
 
-test -L cat || ln -s applets cat
+pushd usr/bin
+cp ../../../apps/applets applets
 test -L tee || ln -s applets tee
 test -L tr || ln -s applets tr
 test -L uname || ln -s applets uname
 test -L poweroff || ln -s applets poweroff
+popd
+
+pushd opt
+cp ../../apps/fork-test fork-test
 popd
 
 find . | \

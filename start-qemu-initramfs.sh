@@ -4,5 +4,5 @@ qemu-system-riscv64 \
     -m 1G \
     -kernel ./linux-6.2.10/arch/riscv/boot/Image \
     -initrd ./initramfs.cpio.gz \
-    -append "root=/dev/ram rdinit=/bin/init console=ttyS0" \
+    -append "root=/dev/ram rdinit=/sbin/init console=ttyS0" \
     -nographic
