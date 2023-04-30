@@ -11,16 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <libgen.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdbool.h>
-#include <sys/reboot.h>
 
 void print_usage(void)
 {
     char *text =
         "Available applets:\n"
-        "    tee, tr, uname, poweroff\n"
+        "    tee, tr, uname\n"
         "\n"
         "Usage:\n"
         "    applets applet_name args0 args1 ...\n"
@@ -31,7 +29,6 @@ void print_usage(void)
         "    applets tr [:upper:] [:lower:]\n"
         "    applets tr [:blank:] _\n"
         "    applets uname\n"
-        "    applets poweroff\n"
         "\n"
         "You can call the applet by link name by creating a link. e.g.\n"
         "\n"
@@ -207,13 +204,6 @@ int command_uname(void)
     return EXIT_SUCCESS;
 }
 
-int command_poweroff(void)
-{
-    sync();
-    reboot(RB_POWER_OFF);
-    return EXIT_SUCCESS;
-}
-
 int main(int argc, char **argv)
 {
     char *filepath = argv[0];
@@ -293,19 +283,6 @@ int main(int argc, char **argv)
         //
         // uname
         return command_uname();
-    }
-    else if (strcmp(command, "poweroff") == 0)
-    {
-        if (argc != 1)
-        {
-            fputs("Does not support parameters.\n", stderr);
-            return EXIT_FAILURE;
-        }
-
-        // usage:
-        //
-        // poweroff
-        return command_poweroff();
     }
     else
     {

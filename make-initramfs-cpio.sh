@@ -3,9 +3,11 @@ set -ex
 
 pushd apps
 riscv64-linux-gnu-gcc -g -Wall -static -o init init.c
-riscv64-linux-gnu-gcc -g -Wall -static -o sh sh.c
 riscv64-linux-gnu-gcc -g -Wall -static -o mount mount.c
 riscv64-linux-gnu-gcc -g -Wall -static -o umount umount.c
+riscv64-linux-gnu-gcc -g -Wall -static -o poweroff poweroff.c
+riscv64-linux-gnu-gcc -g -Wall -static -o sh sh.c
+riscv64-linux-gnu-gcc -g -Wall -static -o echo echo.c
 riscv64-linux-gnu-gcc -g -Wall -static -o pwd pwd.c
 riscv64-linux-gnu-gcc -g -Wall -static -o cat cat.c
 riscv64-linux-gnu-gcc -g -Wall -static -o ls ls.c
@@ -52,10 +54,12 @@ pushd sbin
 cp ../../apps/init init
 cp ../../apps/mount mount
 cp ../../apps/umount umount
+cp ../../apps/poweroff poweroff
 popd
 
 pushd bin
 cp ../../apps/sh sh
+cp ../../apps/echo echo
 cp ../../apps/pwd pwd
 cp ../../apps/ls ls
 cp ../../apps/cat cat

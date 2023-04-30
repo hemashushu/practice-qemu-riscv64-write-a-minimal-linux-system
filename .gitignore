@@ -7,11 +7,14 @@ linux-6.2.10
 linux-6.2.10.tar.xz
 
 apps/init
+apps/poweroff
 apps/sh
 apps/mount
 apps/umount
 apps/pwd
 apps/ls
+apps/cat
+apps/echo
 apps/applets
 apps/fork-test
 

@@ -1,4 +1,8 @@
 {
     "files.associations": {
+        "*.excalidraw": "json",
+        "*.excalidrawlib": "json",
+        "*.S": "asm-intel-x86-generic",
+        "libgen.h": "c"
     }
 }
