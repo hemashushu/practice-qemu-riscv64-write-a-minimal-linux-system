@@ -25,10 +25,11 @@ mkdir -p usr/bin
 mkdir -p etc
 mkdir -p root
 mkdir -p proc
+mkdir -p sys
 
 # optional
-mkdir -p sys
 mkdir -p run
+mkdir -p tmp
 mkdir -p dev
 mkdir -p opt
 
@@ -37,10 +38,11 @@ echo "Hello, My own Linux system!" > root/hello.txt
 cat << "EOF" > etc/rc
 #!/bin/sh
 mount -t proc proc /proc
+mount -t sysfs sysfs /sys
 
 # optional
-mount -t sysfs sysfs /sys
 mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
 mount -t devtmpfs devtmpfs /dev
 
 # start an interactive shell

@@ -11,6 +11,7 @@
             // "args": ["cat", "/home/yang/temp/foo.txt", "/home/yang/temp/bar.txt"],
             // "args": ["tee", "/home/yang/temp/foobar.txt"],
             // "args": ["tr", "[:blank:]", "_"],
+            // "args": ["/home/yang/temp"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
