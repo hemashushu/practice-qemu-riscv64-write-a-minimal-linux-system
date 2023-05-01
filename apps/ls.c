@@ -14,17 +14,8 @@
 #include <dirent.h>
 #include <string.h>
 
-int list_directory(void)
+int list_directory(char *filepath)
 {
-    const int MAX_PATH_LENGTH = 1024;
-    char filepath[MAX_PATH_LENGTH];
-
-    if (getcwd(filepath, MAX_PATH_LENGTH) == NULL)
-    {
-        perror("getcwd");
-        return EXIT_FAILURE;
-    }
-
     DIR *dir = opendir(filepath);
     if (dir == NULL)
     {
@@ -59,6 +50,20 @@ int list_directory(void)
     return EXIT_SUCCESS;
 }
 
+int list_current_directory(void)
+{
+    const int MAX_PATH_LENGTH = 1024;
+    char filepath[MAX_PATH_LENGTH];
+
+    if (getcwd(filepath, MAX_PATH_LENGTH) == NULL)
+    {
+        perror("getcwd");
+        return EXIT_FAILURE;
+    }
+
+    return list_directory(filepath);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 1)
@@ -68,6 +73,6 @@ int main(int argc, char **argv)
     }
     else
     {
-        return list_directory();
+        return list_current_directory();
     }
 }

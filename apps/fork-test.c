@@ -35,7 +35,6 @@ int main(int argc, char **argv)
 
     int level = atoi(argv[1]);
     char *leading = malloc(tab_len * level + 1);
-    // memset(leading, 0, tab_len * level + 1);
 
     for (int i = 0; i < level; i++)
     {
@@ -95,7 +94,8 @@ int main(int argc, char **argv)
     sleep(seconds);
 
     pid_t eppid = getppid();
-    if (eppid != sppid) {
+    if (eppid != sppid)
+    {
         puts("");
         printf("%s[%d] !!! my parent process has been changed.\n", leading, pid);
     }

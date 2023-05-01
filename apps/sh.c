@@ -114,10 +114,22 @@ void loop(void)
     char *line;
     struct Task *task;
 
+    // the Shell prompt is controled by env PS1
+    // PS1 is commonly "[\u@\h \W] \$ ".
+    //
+    // some special characters:
+    // \u - The username of the current user.
+    // \h - The hostname of the computer.
+    // \w - The current working directory.
+    // \W - The basename of the current working directory.
+    //
+    // build a fake PS1
+    char *PS1 = "[root@localhost %s] # ";
+
     while (true)
     {
         cwd = get_current_working_directory();
-        snprintf(prompt, sizeof(prompt), "%s > ", cwd);
+        snprintf(prompt, sizeof(prompt), PS1, cwd);
         fputs(prompt, stdout);
 
         line = get_command_line();

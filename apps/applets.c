@@ -6,8 +6,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-// a program contains multiple applets like BusyBox.
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <libgen.h>
@@ -217,12 +215,13 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        // convert
+        // convert:
         //
         // argv[0] argv[1] argv[2] argv[3]
         // applets command arg0    arg1
         //
         //    |
+        //    to
         //    V
         //
         // argv[0]  argv[1] argv[2]
