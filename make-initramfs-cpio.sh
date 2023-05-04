@@ -11,8 +11,8 @@ riscv64-linux-gnu-gcc -g -Wall -static -o echo echo.c
 riscv64-linux-gnu-gcc -g -Wall -static -o pwd pwd.c
 riscv64-linux-gnu-gcc -g -Wall -static -o cat cat.c
 riscv64-linux-gnu-gcc -g -Wall -static -o ls ls.c
+riscv64-linux-gnu-gcc -g -Wall -static -o time time.c
 riscv64-linux-gnu-gcc -g -Wall -static -o applets applets.c
-riscv64-linux-gnu-gcc -g -Wall -static -o fork-test fork-test.c
 popd
 
 mkdir -p initramfs
@@ -31,7 +31,6 @@ mkdir -p sys
 mkdir -p run
 mkdir -p tmp
 mkdir -p dev
-mkdir -p opt
 
 echo "Hello, My own Linux system!" > root/hello.txt
 
@@ -68,15 +67,12 @@ cp ../../apps/cat cat
 popd
 
 pushd usr/bin
+cp ../../../apps/time time
 cp ../../../apps/applets applets
 test -L tee || ln -s applets tee
 test -L tr || ln -s applets tr
 test -L uname || ln -s applets uname
 test -L poweroff || ln -s applets poweroff
-popd
-
-pushd opt
-cp ../../apps/fork-test fork-test
 popd
 
 find . | \

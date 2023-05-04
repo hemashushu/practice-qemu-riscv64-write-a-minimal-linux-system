@@ -13,6 +13,8 @@
             // "args": ["tr", "[:blank:]", "_"],
             // "args": ["uname"],
             // "args": ["uname", "-r"],
+            // "args": ["sha256sum", "-b", "/usr/lib/libc.so.6"],
+            // "args": ["sha256sum", "/run/media/yang/linuxfile/linux_files/riscv64-elf-ubuntu-20.04-nightly-2022.06.10-nightly.tar.gz"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],

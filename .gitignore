@@ -16,7 +16,7 @@ apps/ls
 apps/cat
 apps/echo
 apps/applets
-apps/fork-test
+apps/time
 
 initramfs
 initramfs.cpio.gz
