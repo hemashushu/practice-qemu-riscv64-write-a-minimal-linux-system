@@ -11,6 +11,8 @@
 #include <libgen.h>
 #include <string.h>
 #include <stdbool.h>
+#include <getopt.h>
+#include <sys/utsname.h>
 
 void print_usage(void)
 {
@@ -26,7 +28,7 @@ void print_usage(void)
         "    applets tee\n"
         "    applets tr [:upper:] [:lower:]\n"
         "    applets tr [:blank:] _\n"
-        "    applets uname\n"
+        "    applets uname [OPTION]...\n"
         "\n"
         "You can call the applet by link name by creating a link. e.g.\n"
         "\n"
@@ -182,23 +184,164 @@ int command_tr(char *find, char *replace)
     return EXIT_SUCCESS;
 }
 
-int command_uname(void)
+void print_uname_usage(void)
 {
-    char *filepath = "/proc/version";
-    FILE *file = fopen(filepath, "r");
-    if (file == NULL)
+    char *text =
+        "Usage: uname [OPTION]...\n"
+        "-a, --all                print all information\n"
+        "-s, --kernel-name        print the kernel name\n"
+        "-n, --nodename           print the network node hostname\n"
+        "-r, --kernel-release     print the kernel release\n"
+        "-v, --kernel-version     print the kernel version\n"
+        "-m, --machine            print the machine hardware name\n"
+        "    --help               display this help and exit\n"
+        "    --version            output version information and exit\n";
+    fputs(text, stdout);
+}
+
+int command_uname(int argc, char **argv)
+{
+    bool has_all = false;
+    bool has_kernel_name = false;
+    bool has_nodename = false;
+    bool has_kernel_release = false;
+    bool has_kernel_version = false;
+    bool has_machine = false;
+    bool has_help = false;
+    bool has_version = false;
+
+    struct option longopts[] = {
+        {"all", 0, NULL, 'a'},
+        {"kernel-name", 0, NULL, 's'},
+        {"nodename", 0, NULL, 'n'},
+        {"kernel-release", 0, NULL, 'r'},
+        {"kernel-version", 0, NULL, 'v'},
+        {"machine", 0, NULL, 'm'},
+        {"help", 0, NULL, 'h'},
+        {"version", 0, NULL, 'V'},
+        {NULL, 0, NULL, 0}};
+
+    if (argc == 1)
     {
-        perror("fopen");
-        fputs("mount /proc first.\n", stderr);
-        return EXIT_FAILURE;
+        has_kernel_name = true;
+    }
+    else
+    {
+        int opt;
+        while ((opt = getopt_long(argc, argv, "asnrvm", longopts, NULL)) != -1)
+        {
+            switch (opt)
+            {
+            case 'a':
+                has_all = true;
+                break;
+            case 's':
+                has_kernel_name = true;
+                break;
+            case 'n':
+                has_nodename = true;
+                break;
+            case 'r':
+                has_kernel_release = true;
+                break;
+            case 'v':
+                has_kernel_version = true;
+                break;
+            case 'm':
+                has_machine = true;
+                break;
+            case 'h': // long only
+                has_help = true;
+                break;
+            case 'V': // long only
+                has_version = true;
+                break;
+            case ':':
+                // unreachable
+                // there is no option requre argument currently.
+                // note: the argument value is stored in variable `char* optarg`
+                exit(EXIT_FAILURE);
+                break;
+            case '?':
+                // unknown option
+                // note: the option value is stored in variable `int optopt`
+                exit(EXIT_FAILURE);
+                break;
+            }
+        }
+
+        if (optind < argc)
+        {
+            fprintf(stderr, "unknown argument: %s\n", argv[optind]);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    const int BUF_SIZE = 1024;
-    char buf[BUF_SIZE];
-    fread(buf, 1, BUF_SIZE, file);
-    fclose(file);
+    if (has_version)
+    {
+        printf("uname 1.0\n");
+        exit(EXIT_SUCCESS);
+    }
 
-    fputs(buf, stdout);
+    if (has_help)
+    {
+        print_uname_usage();
+        exit(EXIT_SUCCESS);
+    }
+
+    if (has_all)
+    {
+        has_kernel_name = true;
+        has_nodename = true;
+        has_kernel_release = true;
+        has_kernel_version = true;
+        has_machine = true;
+    }
+
+    char buf[1024];
+    buf[0] = '\0';
+
+    struct utsname uts;
+    if (uname(&uts) == -1)
+    {
+        perror("uname");
+        exit(EXIT_FAILURE);
+    }
+
+    if (has_kernel_name)
+    {
+        strcat(buf, uts.sysname);
+        strcat(buf, " ");
+    }
+
+    if (has_nodename)
+    {
+        strcat(buf, uts.nodename);
+        strcat(buf, " ");
+    }
+
+    if (has_kernel_release)
+    {
+        strcat(buf, uts.release);
+        strcat(buf, " ");
+    }
+
+    if (has_kernel_version)
+    {
+        strcat(buf, uts.version);
+        strcat(buf, " ");
+    }
+
+    if (has_machine)
+    {
+        strcat(buf, uts.machine);
+        strcat(buf, " ");
+    }
+
+    buf[strlen(buf) - 1] = '\0';
+
+    printf("%s\n", buf);
+
     return EXIT_SUCCESS;
 }
 
@@ -272,16 +415,13 @@ int main(int argc, char **argv)
     }
     else if (strcmp(command, "uname") == 0)
     {
-        if (argc != 1)
-        {
-            fputs("Does not support parameters.\n", stderr);
-            return EXIT_FAILURE;
-        }
-
         // usage:
         //
         // uname
-        return command_uname();
+        // uname -a[-s,-n,-r,-v,-m]
+        // uname --all[--kernel-name,--nodename,--kernel-release,--kernel-version,--machine]
+        // uname --help[--version]
+        return command_uname(argc, argv);
     }
     else
     {
